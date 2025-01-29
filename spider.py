@@ -41,6 +41,40 @@ def scrape_table(url):
     df = pd.DataFrame(rows, columns=headers)
     return df
 
+def fetch_publication_data(name_list, publications):
+    for i in name_list:
+        url = "https://www.nottingham.ac.uk/computerscience/people/" + i+ "#lookup-publications"
+        print(url)
+    # 发送请求获取网页内容
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # 确保请求成功
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        for item in soup.find_all('li'):
+            citation = item.find('div', class_='conferenceContributionCitation')
+            if citation:
+                authors = citation.find('span', class_='citationConferenceContributionAuthors')
+                year = citation.find('span', class_='citationConferenceYear')
+                title = citation.find('span', class_='citationConferenceContributionTitle')
+                conference = citation.find('span', class_='citationConferenceTitle')
+                pages = citation.find('span', class_='citationConferencePages')
+            
+                doi_link = citation.find('a')  # 检查是否有 DOI 相关的链接
+                doi = doi_link['href'] if doi_link else 'No DOI'
+            
+                publications.append({
+                'authors': authors.get_text(strip=True) if authors else '',
+                'year': year.get_text(strip=True) if year else '',
+                'title': title.get_text(strip=True) if title else '',
+                'conference': conference.get_text(strip=True) if conference else '',
+                'pages': pages.get_text(strip=True) if pages else '',
+                'doi': doi
+            })
+
+
+publications = []
+
 # 示例 URL
 url = "https://www.nottingham.ac.uk/computerscience/people/index.aspx"
 df = scrape_table(url)
@@ -50,44 +84,28 @@ df = scrape_table(url)
 name_list = df['Name'].tolist()
 # print(name_list)
 
-publications = []
 
+fetch_publication_data(name_list, publications)
 
+url = "https://www.nottingham.ac.uk/computerscience/people/index.aspx#lookup-research"
+df = scrape_table(url)
 
-for i in name_list:
-    url = "https://www.nottingham.ac.uk/computerscience/people/" + i+ "#lookup-publications"
-    print(url)
-    # 发送请求获取网页内容
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()  # 确保请求成功
+name_list = df['Name'].tolist()
 
-    soup = BeautifulSoup(response.text, 'html.parser')
-    for item in soup.find_all('li'):
-        citation = item.find('div', class_='conferenceContributionCitation')
-        if citation:
-            authors = citation.find('span', class_='citationConferenceContributionAuthors')
-            year = citation.find('span', class_='citationConferenceYear')
-            title = citation.find('span', class_='citationConferenceContributionTitle')
-            conference = citation.find('span', class_='citationConferenceTitle')
-            pages = citation.find('span', class_='citationConferencePages')
-            
-            doi_link = citation.find('a')  # 检查是否有 DOI 相关的链接
-            doi = doi_link['href'] if doi_link else 'No DOI'
-            
-            publications.append({
-                'authors': authors.get_text(strip=True) if authors else '',
-                'year': year.get_text(strip=True) if year else '',
-                'title': title.get_text(strip=True) if title else '',
-                'conference': conference.get_text(strip=True) if conference else '',
-                'pages': pages.get_text(strip=True) if pages else '',
-                'doi': doi
-            })
+fetch_publication_data(name_list, publications)
+
+unique_entries = []
+seen = set()
+for entry in publications:
+    key = (entry['title'].strip(), entry['authors'].strip(), entry['year'].strip())
+    if key not in seen:
+        seen.add(key)
+        unique_entries.append(entry)
 
 #print(publications)
 
-df = pd.DataFrame(publications)
+df = pd.DataFrame(unique_entries)
 
 # Saving to an Excel file
-file_path = "research_paper.xlsx"
+file_path = "papers_list.xlsx"
 df.to_excel(file_path, index=False)
